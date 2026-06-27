@@ -4,232 +4,36 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Business Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6">
+  <div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex justify-between items-center border-b border-slate-700 pb-4">
+      <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Find Creators</h1>
+      <span class="bg-indigo-500/10 text-indigo-400 text-sm font-semibold px-4 py-1.5 rounded-full border border-indigo-500/20">💼 Business Account</span>
+    </div>
 
-  <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
-        <div class="flex items-center gap-2">
-          <div class="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
-            <i class="fa-solid fa-briefcase"></i>
+    <p class="text-slate-400">Browse elite content creators. Click "Hire Now" to call them immediately.</p>
+
+    <!-- Demo Creator List -->
+    <div class="grid md:grid-cols-2 gap-4 mt-6">
+      <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl flex flex-col justify-between">
+        <div>
+          <div class="flex items-center gap-3">
+            <div class="text-2xl">📸</div>
+            <div>
+              <h3 class="text-lg font-bold text-white">Subash Chhetri</h3>
+              <p class="text-xs text-slate-400">Tech & Lifestyle Creator</p>
+            </div>
           </div>
-          <span class="text-xl font-bold tracking-tight text-slate-900">BizSuite</span>
+          <p class="text-slate-400 text-sm mt-4">I build high-engagement video content for brands looking to scale on TikTok and YouTube.</p>
         </div>
-        <div class="flex items-center gap-4">
-          <span id="business-name" class="text-sm font-medium text-slate-600">Loading company...</span>
-          <button id="btn-logout" class="text-sm font-semibold text-rose-600 hover:bg-rose-50 px-3 py-2 rounded-lg transition-colors">
-            Log Out
-          </button>
-        </div>
+        <!-- This button calls the phone number directly -->
+        <a href="tel:9800565362" class="block text-center mt-6 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition">
+          📞 Hire Now (Call)
+        </a>
       </div>
     </div>
-  </nav>
-
-  <main class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-    
-    <div class="lg:col-span-2 space-y-6">
-      <div class="space-y-1">
-        <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Creator Directory</h1>
-        <p class="text-slate-500">Discover top creative talent ready for immediate contract hiring.</p>
-      </div>
-
-      <div id="talent-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="animate-pulse bg-white p-5 rounded-xl border border-slate-100 space-y-3">
-          <div class="h-4 bg-slate-200 rounded w-1/3"></div>
-          <div class="h-4 bg-slate-200 rounded w-2/3"></div>
-          <div class="h-9 bg-slate-200 rounded w-full"></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="space-y-6">
-      <div class="space-y-1">
-        <h2 class="text-xl font-bold text-slate-900 tracking-tight">Incoming Applications</h2>
-        <p class="text-xs text-slate-500">Real-time alerts from creators applying to your postings.</p>
-      </div>
-
-      <div id="notification-container" class="space-y-3">
-        <div class="text-center p-8 bg-white rounded-xl border border-slate-200/60 text-slate-400 text-sm">
-          No live notifications yet.
-        </div>
-      </div>
-    </div>
-
-  </main>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { 
-      getAuth, 
-      onAuthStateChanged, 
-      signOut 
-    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { 
-      getFirestore, 
-      doc, 
-      getDoc, 
-      collection, 
-      getDocs, 
-      query, 
-      where,
-      onSnapshot 
-    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-    // --- PASTE YOUR EXACT SAME CONFIG HERE ---
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY_HERE",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
-
-    // Initialize Firebase Services
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-
-    let currentBusiness = null;
-
-    // DOM Target Elements
-    const businessNameEl = document.getElementById('business-name');
-    const talentContainer = document.getElementById('talent-container');
-    const notificationContainer = document.getElementById('notification-container');
-    const btnLogout = document.getElementById('btn-logout');
-
-    // 1. ROUTING GUARD & PROFILE LOADER
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        window.location.href = 'index.html';
-        return;
-      }
-
-      const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists() && docSnap.data().role === 'business') {
-        currentBusiness = { uid: user.uid, ...docSnap.data() };
-        businessNameEl.innerText = `💼 ${currentBusiness.fullName}`;
-        
-        // Load Core Feeds
-        fetchTalentDirectory();
-        setupRealtimeNotifications(user.uid);
-      } else {
-        alert("Access Denied: Business Accounts only.");
-        window.location.href = 'index.html';
-      }
-    });
-
-    // 2. FETCH ALL CREATORS FOR THE DIRECTORY
-    async function fetchTalentDirectory() {
-      try {
-        // Query only users where role equals 'creator'
-        const q = query(collection(db, "users"), where("role", "==", "creator"));
-        const snapshot = await getDocs(q);
-        
-        talentContainer.innerHTML = ''; // Wipe loading block
-
-        if (snapshot.empty) {
-          talentContainer.innerHTML = `<p class="text-sm text-slate-400 p-4">No creators have signed up yet.</p>`;
-          return;
-        }
-
-        snapshot.forEach((creatorDoc) => {
-          const data = creatorDoc.data();
-          
-          const card = document.createElement('div');
-          card.className = "bg-white p-5 rounded-xl border border-slate-200/70 shadow-sm flex flex-col justify-between gap-4 hover:shadow-md transition-shadow";
-          
-          card.innerHTML = `
-            <div class="space-y-1">
-              <div class="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center text-sm font-bold mb-2">
-                ${data.fullName ? data.fullName.charAt(0).toUpperCase() : 'C'}
-              </div>
-              <h4 class="font-bold text-slate-900">${data.fullName}</h4>
-              <p class="text-xs text-slate-500 flex items-center gap-1">
-                <i class="fa-regular fa-envelope"></i> ${data.email}
-              </p>
-            </div>
-            <a href="tel:${data.phone}" class="w-full text-center py-2 px-4 bg-slate-950 hover:bg-slate-800 text-white font-medium text-sm rounded-lg flex items-center justify-center gap-2 transition-colors">
-              <i class="fa-solid fa-phone text-xs"></i> Hire Now
-            </a>
-          `;
-          
-          talentContainer.appendChild(card);
-        });
-      } catch (err) {
-        console.error("Failed syncing database profiles: ", err);
-      }
-    }
-
-    // 3. LISTEN TO LIVE APPLICATION EVENTS (REAL-TIME SNAPSHOT)
-    function setupRealtimeNotifications(businessId) {
-      const q = query(
-        collection(db, "notifications"), 
-        where("businessId", "==", businessId)
-      );
-
-      // onSnapshot fires an event stream anytime data changes on the server real-time
-      onSnapshot(q, (snapshot) => {
-        notificationContainer.innerHTML = '';
-
-        if (snapshot.empty) {
-          notificationContainer.innerHTML = `
-            <div class="text-center p-8 bg-white rounded-xl border border-slate-100 text-slate-400 text-sm">
-              <i class="fa-regular fa-bell-slash text-lg mb-2 block text-slate-300"></i> No applications found for your posts.
-            </div>`;
-          return;
-        }
-
-        snapshot.forEach((notifDoc) => {
-          const alertData = notifDoc.data();
-
-          const alertBox = document.createElement('div');
-          alertBox.className = "bg-white p-4 rounded-xl border-l-4 border-indigo-500 shadow-sm border-y border-r border-slate-200 space-y-3";
-          
-          alertBox.innerHTML = `
-            <div class="text-sm">
-              <span class="font-bold text-slate-900">${alertData.creatorName}</span> 
-              applied to your opening for <span class="font-medium text-indigo-600">"${alertData.projectTitle}"</span>
-            </div>
-            
-            <div id="details-${notifDoc.id}" class="hidden text-xs bg-slate-50 p-2.5 rounded border border-slate-100 space-y-1 text-slate-600">
-              <p><strong>Email:</strong> ${alertData.creatorEmail}</p>
-              <p><strong>Phone:</strong> ${alertData.creatorPhone}</p>
-            </div>
-
-            <div class="flex gap-2">
-              <button id="view-${notifDoc.id}" class="flex-1 py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs rounded transition-colors">
-                View Profile Details
-              </button>
-              <a href="tel:${alertData.creatorPhone}" class="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded flex items-center gap-1 transition-colors">
-                <i class="fa-solid fa-phone text-[10px]"></i> Call
-              </a>
-            </div>
-          `;
-
-          notificationContainer.appendChild(alertBox);
-
-          // Interactive dynamic toggle for profile expansion block
-          document.getElementById(`view-${notifDoc.id}`).addEventListener('click', () => {
-            const el = document.getElementById(`details-${notifDoc.id}`);
-            el.classList.toggle('hidden');
-          });
-        });
-      });
-    }
-
-    // 4. LOG OUT HANDLER
-    btnLogout.addEventListener('click', () => {
-      signOut(auth).then(() => {
-        localStorage.removeItem('userRole');
-        window.location.href = 'index.html';
-      });
-    });
-  </script>
+  </div>
 </body>
 </html>
