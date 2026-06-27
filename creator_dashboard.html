@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Creator Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-  <style>
-    ::-webkit-scrollbar { display: none; }
-  </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen pb-24">
 
@@ -24,7 +21,9 @@
     
     <div id="view-home" class="space-y-4">
       <p class="text-slate-400 text-sm">Open Job Orders. Apply to instantly notify the Brand managers.</p>
-      <div id="jobs-container" class="space-y-4"></div>
+      <div id="jobs-container" class="space-y-4">
+        <div class="text-center py-12 text-slate-500">Loading live jobs...</div>
+      </div>
     </div>
 
     <div id="view-profile" class="hidden bg-slate-800 border border-slate-700 p-6 rounded-2xl space-y-4">
@@ -42,8 +41,24 @@
     </div>
   </nav>
 
-  <script>
-    function switchTab(viewName) {
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDhAKv-jzS0tCIJCXfqiV6KmcaabUn8904",
+      authDomain: "creator-business-connect.firebaseapp.com",
+      projectId: "creator-business-connect",
+      storageBucket: "creator-business-connect.firebasestorage.app",
+      messagingSenderId: "754435602005",
+      appId: "1:754435602005:web:068fe02c5ade2fe40306dc",
+      measurementId: "G-G0C32CWESE"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.switchTab = (viewName) => {
       ['home', 'profile'].forEach(tab => {
         document.getElementById(`view-${tab}`).classList.toggle('hidden', tab !== viewName);
         document.getElementById(`nav-${tab}`).className = tab === viewName 
@@ -51,42 +66,54 @@
           : "flex flex-col items-center py-1 text-slate-400 text-xs cursor-pointer";
       });
       document.getElementById('creator-title').innerText = viewName === 'home' ? 'Creator Feed' : 'My Profile';
-    }
+    };
 
-    function displayJobs() {
+    async function fetchLiveJobs() {
       const container = document.getElementById('jobs-container');
-      const jobs = JSON.parse(localStorage.getItem('platformJobs')) || [];
+      try {
+        // Query the database collection ordered by newest first
+        const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+          container.innerHTML = `<div class="text-center py-12 text-slate-500 border-2 border-dashed border-slate-800 rounded-2xl">No open project postings found.</div>`;
+          return;
+        }
 
-      if(jobs.length === 0) {
-        container.innerHTML = `<div class="text-center py-12 text-slate-500 border-2 border-dashed border-slate-800 rounded-2xl">No open project postings found.</div>`;
-        return;
+        let htmlFeed = "";
+        querySnapshot.forEach((doc) => {
+          const job = doc.data();
+          htmlFeed += `
+            <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl space-y-3">
+              <div>
+                <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">💼 ${job.company}</span>
+                <h3 class="text-lg font-bold text-white mt-0.5">${job.title}</h3>
+                <p class="text-slate-400 text-sm mt-2">${job.details}</p>
+              </div>
+              <button onclick="applyJob(this)" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition text-sm cursor-pointer">Apply Now</button>
+            </div>
+          `;
+        });
+        container.innerHTML = htmlFeed;
+      } catch (error) {
+        container.innerHTML = `<div class="text-center py-12 text-rose-400">Error loading jobs: ${error.message}</div>`;
       }
-
-      container.innerHTML = jobs.map((job) => `
-        <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl space-y-3">
-          <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">💼 ${job.company}</span>
-            <h3 class="text-lg font-bold text-white mt-0.5">${job.title}</h3>
-            <p class="text-slate-400 text-sm mt-2">${job.details}</p>
-          </div>
-          <button onclick="applyJob(this)" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition text-sm cursor-pointer">Apply Now</button>
-        </div>
-      `).join('');
     }
 
-    function applyJob(button) {
+    window.applyJob = (button) => {
       button.innerText = "✓ Applied";
       button.className = "w-full py-2.5 bg-slate-700 text-slate-400 font-bold rounded-xl text-sm cursor-not-allowed";
       button.disabled = true;
       alert("Application sent successfully to the brand!");
-    }
+    };
 
-    function handleLogout() {
+    window.handleLogout = () => {
       localStorage.clear();
       window.location.href = 'index.html';
-    }
+    };
 
-    window.onload = displayJobs;
+    // Run automatically on load
+    fetchLiveJobs();
   </script>
 </body>
 </html>
