@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Moderation Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen hidden" id="admin-body">
+
+  <nav class="bg-slate-950 border-b border-slate-800 sticky top-0 z-50 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-crimson bg-rose-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-rose-600/30">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <span class="text-xl font-black tracking-wider text-white">HQ_PANEL</span>
+          <span class="text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">Admin</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <span id="admin-identity" class="text-sm font-medium text-slate-400">Verifying session...</span>
+          <button id="btn-logout" class="text-sm font-semibold bg-slate-800 text-slate-300 hover:bg-rose-600 hover:text-white px-3 py-2 rounded-lg transition-all duration-200">
+            Secure Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-4 py-8 space-y-12">
+    
+    <div>
+      <h1 class="text-3xl font-black tracking-tight text-white">System Moderation</h1>
+      <p class="text-slate-400 text-sm">Review, inspect, or remove platform entities across production systems.</p>
+    </div>
+
+    <div class="bg-slate-950 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+      <div class="p-5 border-b border-slate-800 bg-slate-950/50 flex items-center gap-2">
+        <i class="fa-solid fa-wand-magic-sparkles text-emerald-400"></i>
+        <h2 class="text-lg font-bold text-white">Registered Creators</h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-800 text-slate-400 text-xs font-bold uppercase tracking-wider bg-slate-900/40">
+              <th class="p-4">Name</th>
+              <th class="p-4">Email</th>
+              <th class="p-4">Phone</th>
+              <th class="p-4">Date Joined</th>
+              <th class="p-4 text-right">Moderation Actions</th>
+            </tr>
+          </thead>
+          <tbody id="creators-table-body" class="divide-y divide-slate-800 text-sm text-slate-300">
+            </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bg-slate-950 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+      <div class="p-5 border-b border-slate-800 bg-slate-950/50 flex items-center gap-2">
+        <i class="fa-solid fa-briefcase text-indigo-400"></i>
+        <h2 class="text-lg font-bold text-white">Registered Businesses</h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-800 text-slate-400 text-xs font-bold uppercase tracking-wider bg-slate-900/40">
+              <th class="p-4">Company Owner Name</th>
+              <th class="p-4">Email</th>
+              <th class="p-4">Phone</th>
+              <th class="p-4">Date Joined</th>
+              <th class="p-4 text-right">Moderation Actions</th>
+            </tr>
+          </thead>
+          <tbody id="businesses-table-body" class="divide-y divide-slate-800 text-sm text-slate-300">
+            </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      getAuth, 
+      onAuthStateChanged, 
+      signOut 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { 
+      getFirestore, 
+      doc, 
+      getDoc, 
+      collection, 
+      getDocs, 
+      deleteDoc 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // --- PASTE YOUR EXACT SAME CONFIG HERE ---
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY_HERE",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    // Initialize Services
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // DOM References
+    const adminBody = document.getElementById('admin-body');
+    const adminIdentity = document.getElementById('admin-identity');
+    const creatorsTableBody = document.getElementById('creators-table-body');
+    const businessesTableBody = document.getElementById('businesses-table-body');
+    const btnLogout = document.getElementById('btn-logout');
+
+    // 1. STRICT ADMINISTRATIVE ENFORCEMENT GUARD
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      try {
+        // Assert look-up checks inside target user profile doc
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists() && docSnap.data().role === 'admin') {
+          adminIdentity.innerText = `🛡️ Root: ${docSnap.data().fullName}`;
+          // Reveal document structural elements *only* after role validation confirms true
+          adminBody.classList.remove('hidden');
+          
+          // Execute Directory Builds
+          loadSystemUsers();
+        } else {
+          // Instantly kick out unauthorized roles
+          alert("Security Exception: Access Denied. Session terminated.");
+          signOut(auth).then(() => { window.location.href = 'index.html'; });
+        }
+      } catch (err) {
+        console.error("Auth clearance error:", err);
+        window.location.href = 'index.html';
+      }
+    });
+
+    // 2. FETCH AND CATEGORIZE MASTER DATA TO ARRAYS
+    async function loadSystemUsers() {
+      try {
+        const querySnapshot = await getDocs(collection(db, "users"));
+        
+        // Clean out stale data frames
+        creatorsTableBody.innerHTML = '';
+        businessesTableBody.innerHTML = '';
+
+        let countCreators = 0;
+        let countBusinesses = 0;
+
+        querySnapshot.forEach((userDoc) => {
+          const userData = userDoc.data();
+          const userId = userDoc.id;
+
+          // Format timestamps cleanly
+          const joinDate = userData.createdAt ? new Date(userData.createdAt).toLocaleDateString(undefined, {
+            year: 'numeric', month: 'short', day: 'numeric'
+          }) : 'Legacy Account';
+
+          // Structural Row Markup Construction
+          const rowHTML = `
+            <tr class="hover:bg-slate-900/50 transition-colors" id="row-${userId}">
+              <td class="p-4 font-bold text-white">${userData.fullName || 'Unnamed Account'}</td>
+              <td class="p-4 text-slate-400">${userData.email}</td>
+              <td class="p-4 text-slate-400">${userData.phone || 'N/A'}</td>
+              <td class="p-4 text-slate-500 text-xs">${joinDate}</td>
+              <td class="p-4 text-right">
+                <button 
+                  id="del-${userId}"
+                  class="px-3 py-1.5 bg-rose-950/40 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg border border-rose-500/20 text-xs font-semibold transition-all duration-150 flex items-center gap-1 ml-auto"
+                >
+                  <i class="fa-regular fa-trash-can"></i> Delete User
+                </button>
+              </td>
+            </tr>
+          `;
+
+          // Split records into their respective tables based on their role
+          if (userData.role === 'creator') {
+            creatorsTableBody.insertAdjacentHTML('beforeend', rowHTML);
+            countCreators++;
+          } else if (userData.role === 'business') {
+            businessesTableBody.insertAdjacentHTML('beforeend', rowHTML);
+            countBusinesses++;
+          }
+
+          // Attach dynamic delete listener
+          // Make sure we skip binding if the dynamic record isn't an admin
+          if (userData.role !== 'admin') {
+            document.getElementById(`del-${userId}`).addEventListener('click', () => {
+              purgeUserAccount(userId, userData.fullName);
+            });
+          }
+        });
+
+        // Handle empty table states gracefully
+        if (countCreators === 0) {
+          creatorsTableBody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-500">No creators found.</td></tr>`;
+        }
+        if (countBusinesses === 0) {
+          businessesTableBody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-500">No businesses found.</td></tr>`;
+        }
+
+      } catch (error) {
+        console.error("Failed executing core directory sync query:", error);
+      }
+    }
+
+    // 3. SECURE MUTATION: PURGE TARGET USER FROM FIRESTORE
+    async function purgeUserAccount(uid, name) {
+      const confirmFirst = confirm(`CRITICAL WARNING:\nAre you sure you want to delete ${name}?\n\nThis permanently purges their document from the Firestore "users" database collection.`);
+      
+      if (!confirmFirst) return;
+
+      try {
+        // Target specific unique identifier reference path
+        await deleteDoc(doc(db, "users", uid));
+        
+        // Optimistic DOM removal (clears table entry smoothly without refreshing data streams)
+        const elementRow = document.getElementById(`row-${uid}`);
+        if (elementRow) {
+          elementRow.classList.add('bg-rose-950/20', 'opacity-0', 'transition-all', 'duration-300');
+          setTimeout(() => elementRow.remove(), 300);
+        }
+      } catch (err) {
+        console.error("Critical Mutation Failure:", err);
+        alert("Operation denied. Check Firestore authorization permissions rules.");
+      }
+    }
+
+    // 4. SIGN OUT
+    btnLogout.addEventListener('click', () => {
+      signOut(auth).then(() => {
+        localStorage.removeItem('userRole');
+        window.location.href = 'index.html';
+      });
+    });
+  </script>
+</body>
+</html>

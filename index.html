@@ -1,0 +1,191 @@
+<script type="module">
+  // 1. Import the required Firebase SDK functions from the CDN
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { 
+    getAuth, 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword 
+  } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+  import { 
+    getFirestore, 
+    doc, 
+    setDoc, 
+    getDoc 
+  } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+  // ==========================================
+  // YOUR FIREBASE CONFIGURATION
+  // ==========================================
+  // STEP 1: Go to the Firebase Console (console.firebase.google.com)
+  // STEP 2: Create a project, add a "Web App", and copy the config object.
+  // STEP 3: Replace the placeholder values below with your actual keys.
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY_HERE",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  // Initialize Firebase App, Auth, and Firestore Database
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  // ==========================================
+  // UI & NAVIGATION LOGIC (From previous step)
+  // ==========================================
+  const landingPage = document.getElementById('landing-page');
+  const authPage = document.getElementById('auth-page');
+  const roleBadge = document.getElementById('role-badge');
+  const tabLogin = document.getElementById('tab-login');
+  const tabSignup = document.getElementById('tab-signup');
+  const formLogin = document.getElementById('form-login');
+  const formSignup = document.getElementById('form-signup');
+
+  // Check memory on load
+  window.addEventListener('DOMContentLoaded', () => {
+    const savedRole = localStorage.getItem('userRole');
+    if (savedRole) showAuthPage(savedRole);
+  });
+
+  // Global scope attachments (needed since type="module" isolates functions)
+  window.selectRole = (role) => {
+    localStorage.setItem('userRole', role);
+    landingPage.classList.add('opacity-0', 'scale-95');
+    setTimeout(() => {
+      landingPage.classList.add('hidden');
+      showAuthPage(role);
+    }, 300);
+  };
+
+  window.goBack = () => {
+    localStorage.removeItem('userRole');
+    authPage.classList.add('opacity-0', 'scale-95');
+    setTimeout(() => {
+      authPage.classList.add('hidden');
+      landingPage.classList.remove('hidden');
+      setTimeout(() => landingPage.classList.remove('opacity-0', 'scale-95'), 50);
+    }, 300);
+  };
+
+  window.switchTab = (tab) => {
+    if (tab === 'login') {
+      tabLogin.className = "flex-1 pb-3 text-center font-semibold text-indigo-600 border-b-2 border-indigo-600 transition-all";
+      tabSignup.className = "flex-1 pb-3 text-center font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition-all";
+      formLogin.classList.remove('hidden');
+      formSignup.classList.add('hidden');
+    } else {
+      tabSignup.className = "flex-1 pb-3 text-center font-semibold text-indigo-600 border-b-2 border-indigo-600 transition-all";
+      tabLogin.className = "flex-1 pb-3 text-center font-medium text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition-all";
+      formSignup.classList.remove('hidden');
+      formLogin.classList.add('hidden');
+    }
+  };
+
+  function showAuthPage(role) {
+    roleBadge.innerText = role === 'business' ? '💼 Business Owner' : '✨ Creator';
+    roleBadge.className = role === 'creator' 
+      ? "text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-50 text-emerald-700"
+      : "text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-indigo-50 text-indigo-700";
+
+    authPage.classList.remove('hidden');
+    setTimeout(() => authPage.classList.remove('opacity-0', 'scale-95'), 50);
+  }
+
+  // ==========================================
+  // FIREBASE AUTHENTICATION LOGIC
+  // ==========================================
+
+  // Attach submit listeners to forms
+  formLogin.addEventListener('submit', handleLogin);
+  formSignup.addEventListener('submit', handleSignup);
+
+  // 1. SIGN UP USER
+  async function handleSignup(event) {
+    event.preventDefault();
+
+    // Grab input values dynamically from the form fields
+    const fullName = formSignup.querySelector('input[placeholder="John Doe"]').value;
+    const email = formSignup.querySelector('input[type="email"]').value;
+    const phone = formSignup.querySelector('input[type="tel"]').value;
+    const password = formSignup.querySelector('input[type="password"]').value;
+    const role = localStorage.getItem('userRole'); // Retrieve chosen role from memory
+
+    if (!role) {
+      alert("Error: Role selection missing. Please go back and select a role.");
+      return;
+    }
+
+    try {
+      // Create user authentication record in Firebase
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Create a matching document in Firestore using the unique User ID (uid)
+      await setDoc(doc(db, "users", user.uid), {
+        fullName: fullName,
+        email: email,
+        phone: phone,
+        role: role,
+        createdAt: new Date().toISOString()
+      });
+
+      alert("Account created successfully!");
+      
+      // Redirect based on the role they just registered with
+      redirectBasedOnRole(role);
+
+    } catch (error) {
+      console.error("Signup Error:", error);
+      alert(`Signup Failed: ${error.message}`);
+    }
+  }
+
+  // 2. LOG IN USER
+  async function handleLogin(event) {
+    event.preventDefault();
+
+    const email = formLogin.querySelector('input[type="email"]').value;
+    const password = formLogin.querySelector('input[type="password"]').value;
+
+    try {
+      // Authenticate user credentials
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Fetch the user's specific document from the Firestore "users" collection
+      const docRef = doc(db, "users", user.uid);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const userData = docSnap.data();
+        const role = userData.role;
+        
+        // Save to localStorage just in case it was cleared
+        localStorage.setItem('userRole', role);
+        
+        // Redirect to their respective dashboard
+        redirectBasedOnRole(role);
+      } else {
+        alert("User record not found in database.");
+      }
+
+    } catch (error) {
+      console.error("Login Error:", error);
+      alert(`Login Failed: ${error.message}`);
+    }
+  }
+
+  // 3. REDIRECTION HELPER
+  function redirectBasedOnRole(role) {
+    if (role === 'creator') {
+      window.location.href = 'creator_dashboard.html';
+    } else if (role === 'business') {
+      window.location.href = 'business_dashboard.html';
+    } else {
+      alert("Invalid role detected.");
+    }
+  }
+</script>
